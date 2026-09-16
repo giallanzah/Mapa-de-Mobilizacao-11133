@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API do Mapa de Mobilização 11.133
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: public
+    description: Dados públicos da mobilização
+  - name: reports
+    description: Registros públicos de ações e correções
+  - name: coordination
+    description: Operações da equipe de coordenação
 paths:
   /healthz:
     get:
@@ -24,7 +30,224 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /summary:
+    get:
+      operationId: getMobilizationSummary
+      tags: [public]
+      summary: Resumo da mobilização
+      responses:
+        "200":
+          description: Indicadores públicos da campanha
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MobilizationSummary"
+  /map-config:
+    get:
+      operationId: getMapConfig
+      tags: [public]
+      summary: Configuração pública do mapa
+      responses:
+        "200":
+          description: Token público necessário para renderizar o mapa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapConfig"
+  /regions:
+    get:
+      operationId: listRegions
+      tags: [public]
+      summary: Lista de Regiões Administrativas
+      responses:
+        "200":
+          description: Regiões com contagem de igrejas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Region"
+  /churches:
+    get:
+      operationId: listChurches
+      tags: [public]
+      summary: Lista igrejas do mapa
+      parameters:
+        - name: ra
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, no_group, group_ready, action_done]
+            default: all
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2500
+            default: 2500
+      responses:
+        "200":
+          description: Igrejas filtradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Church"
+  /churches/{churchId}:
+    get:
+      operationId: getChurch
+      tags: [public]
+      summary: Detalhes de uma igreja
+      parameters:
+        - $ref: "#/components/parameters/ChurchId"
+      responses:
+        "200":
+          description: Igreja
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Church"
+        "404":
+          description: Igreja não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /churches/{churchId}/flyer-reports:
+    post:
+      operationId: createFlyerReport
+      tags: [reports]
+      summary: Registra flyers distribuídos
+      parameters:
+        - $ref: "#/components/parameters/ChurchId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlyerReportInput"
+      responses:
+        "201":
+          description: Registro criado e aguardando confirmação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlyerReport"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /churches/{churchId}/issue-reports:
+    post:
+      operationId: createChurchIssueReport
+      tags: [reports]
+      summary: Sinaliza dado incorreto ou igreja fechada
+      parameters:
+        - $ref: "#/components/parameters/ChurchId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChurchIssueInput"
+      responses:
+        "201":
+          description: Sinalização registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChurchIssueReport"
+  /coordination/flyer-reports:
+    get:
+      operationId: listCoordinationFlyerReports
+      tags: [coordination]
+      summary: Lista registros para aprovação
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected, all]
+            default: pending
+      responses:
+        "200":
+          description: Registros de flyers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlyerReport"
+  /coordination/flyer-reports/{reportId}:
+    patch:
+      operationId: updateFlyerReportStatus
+      tags: [coordination]
+      summary: Aprova ou recusa um registro
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlyerReportUpdate"
+      responses:
+        "200":
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlyerReport"
+  /coordination/churches/{churchId}:
+    patch:
+      operationId: updateChurchCoordination
+      tags: [coordination]
+      summary: Edita link e meta da igreja
+      parameters:
+        - $ref: "#/components/parameters/ChurchId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChurchCoordinationUpdate"
+      responses:
+        "200":
+          description: Igreja atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Church"
 components:
+  parameters:
+    ChurchId:
+      name: churchId
+      in: path
+      required: true
+      schema:
+        type: integer
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +256,207 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    MobilizationSummary:
+      type: object
+      properties:
+        churches:
+          type: integer
+        regions:
+          type: integer
+        churchesWithGroups:
+          type: integer
+        churchesWithActions:
+          type: integer
+        confirmedFlyers:
+          type: integer
+        pendingReports:
+          type: integer
+        topRegions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Region"
+      required:
+        - churches
+        - regions
+        - churchesWithGroups
+        - churchesWithActions
+        - confirmedFlyers
+        - pendingReports
+        - topRegions
+    MapConfig:
+      type: object
+      properties:
+        token:
+          type: string
+      required: [token]
+    Region:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        churches:
+          type: integer
+        confirmedFlyers:
+          type: integer
+      required: [code, name, churches, confirmedFlyers]
+    Church:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        regionCode:
+          type: string
+        regionName:
+          type: string
+        address:
+          type: ["string", "null"]
+        locality:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        socialUrl:
+          type: ["string", "null"]
+        latitude:
+          type: number
+        longitude:
+          type: number
+        mapsUrl:
+          type: string
+        whatsappUrl:
+          type: ["string", "null"]
+        flyersConfirmed:
+          type: integer
+        flyerGoal:
+          type: integer
+        status:
+          type: string
+          enum: [no_group, group_ready, action_done]
+      required:
+        - id
+        - name
+        - category
+        - regionCode
+        - regionName
+        - latitude
+        - longitude
+        - mapsUrl
+        - flyersConfirmed
+        - flyerGoal
+        - status
+    FlyerReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        churchId:
+          type: integer
+        churchName:
+          type: string
+        actionDate:
+          type: string
+          format: date
+        flyerCount:
+          type: integer
+        volunteerName:
+          type: string
+        volunteerPhone:
+          type: string
+        note:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - churchId
+        - churchName
+        - actionDate
+        - flyerCount
+        - volunteerName
+        - volunteerPhone
+        - status
+        - createdAt
+    FlyerReportInput:
+      type: object
+      properties:
+        actionDate:
+          type: string
+          format: date
+        flyerCount:
+          type: integer
+          minimum: 1
+        volunteerName:
+          type: string
+          minLength: 2
+        volunteerPhone:
+          type: string
+          minLength: 8
+        note:
+          type: ["string", "null"]
+      required: [actionDate, flyerCount, volunteerName, volunteerPhone]
+    FlyerReportUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+      required: [status]
+    ChurchIssueInput:
+      type: object
+      properties:
+        issueType:
+          type: string
+          enum: [closed, wrong_data, duplicate, other]
+        note:
+          type: string
+          minLength: 4
+        reporterName:
+          type: ["string", "null"]
+        reporterContact:
+          type: ["string", "null"]
+      required: [issueType, note]
+    ChurchIssueReport:
+      type: object
+      properties:
+        id:
+          type: integer
+        churchId:
+          type: integer
+        issueType:
+          type: string
+        note:
+          type: string
+        status:
+          type: string
+          enum: [open, reviewed, dismissed]
+      required: [id, churchId, issueType, note, status]
+    ChurchCoordinationUpdate:
+      type: object
+      properties:
+        whatsappUrl:
+          type: ["string", "null"]
+          format: uri
+        flyerGoal:
+          type: integer
+          minimum: 0
+      required: [flyerGoal]
 

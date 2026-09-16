@@ -1,0 +1,8 @@
+<svg width="320" height="120" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vote Pastor Daniel de Castro 11.133">
+  <rect width="320" height="120" rx="18" fill="#182950"/>
+  <path d="M20 34c10-11 21-13 31-5-8 3-14 8-18 16h-13z" fill="#f8d23b"/>
+  <text x="62" y="32" fill="#f8d23b" font-family="Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="3">VOTE</text>
+  <text x="62" y="55" fill="#fbfaf4" font-family="Arial,sans-serif" font-size="18" font-weight="700">Pastor Daniel de Castro</text>
+  <text x="20" y="98" fill="#fbfaf4" font-family="Arial Black,Arial,sans-serif" font-size="43" font-weight="900" font-style="italic">11.133</text>
+  <path d="M245 104h48" stroke="#f8d23b" stroke-width="3" stroke-linecap="round"/>
+</svg>

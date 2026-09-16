@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Mapa de Mobilização 11.133"
+description = "Aplicação pública para mobilizar igrejas do Distrito Federal, conectar voluntários aos grupos de WhatsApp e acompanhar a distribuição confirmada de flyers da campanha 11.133."
+version = "1.0.0"
+id = "artifacts/mobilizacao-11133"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25719
+
+[services.development]
+run = "pnpm --filter @workspace/mobilizacao-11133 run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mobilizacao-11133", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mobilizacao-11133/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25719"
+BASE_PATH = "/"
