@@ -25,13 +25,13 @@ import {
 
 const router: IRouter = Router();
 
-const markdownPath = path.resolve(
-  process.cwd(),
-  "artifacts/api-server/src/data/igrejas-evangelicas-df.md",
-);
+const markdownPaths = [
+  path.resolve(process.cwd(), "src/data/igrejas-evangelicas-df.md"),
+  path.resolve(process.cwd(), "artifacts/api-server/src/data/igrejas-evangelicas-df.md"),
+];
 
 router.get("/map-config", (_req, res) => {
-  res.json({ token: process.env.MAPBOX_PUBLIC_TOKEN ?? "" });
+  res.set("Cache-Control", "no-store").json({ token: process.env.MAPBOX_PUBLIC_TOKEN ?? "" });
 });
 
 let seedPromise: Promise<void> | undefined;
@@ -85,7 +85,19 @@ async function ensureSeeded() {
       const existing = await db.select({ id: churches.id }).from(churches).limit(1);
       if (existing.length) return;
 
-      const markdown = await fs.readFile(markdownPath, "utf8");
+       let markdown: string | undefined;
+       let lastReadError: unknown;
+       for (const candidate of markdownPaths) {
+         try {
+           markdown = await fs.readFile(candidate, "utf8");
+           break;
+         } catch (error) {
+           lastReadError = error;
+         }
+       }
+       if (markdown === undefined) {
+         throw lastReadError ?? new Error("Base de igrejas não encontrada.");
+       }
       const rows: Array<typeof churches.$inferInsert> = [];
       let regionCode = "RA-I";
       let regionName = "Plano Piloto";

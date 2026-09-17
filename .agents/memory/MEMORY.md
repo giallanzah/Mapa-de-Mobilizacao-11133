@@ -1,0 +1,1 @@
+- [Map runtime resilience](map-runtime-resilience.md) — Mapbox needs a no-WebGL fallback, and API seed assets must resolve from both package and repository working directories.

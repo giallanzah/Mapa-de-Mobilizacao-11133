@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowUpRight, BarChart3, Check, ChevronDown, CircleAlert, ClipboardCheck,
   Filter, Flag, HandHeart, Link as LinkIcon, Loader2, MapPin,
-  Menu, MessageCircle, Navigation, Phone, Search, Send, ShieldCheck,
+  LogOut, Menu, MessageCircle, Navigation, Phone, Search, Send, ShieldCheck,
   Target, Users, X, XCircle,
 } from 'lucide-react';
 import {
@@ -16,7 +16,7 @@ import {
   type Church, type FlyerReport,
 } from '@workspace/api-client-react';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import { ClerkProvider, SignIn, SignUp, useAuth } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useAuth, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import mapboxgl from 'mapbox-gl';
@@ -43,7 +43,7 @@ function Mark({ compact = false }: { compact?: boolean }) {
       </span>
       <span className="leading-none">
         <span className="block text-[10px] font-bold uppercase tracking-[.22em] text-accent">Vote</span>
-        <span className="mt-1 block font-semibold tracking-tight text-sidebar-foreground">Pastor Daniel <em className="not-italic text-accent">de Castro</em></span>
+        <span className={`mt-1 block font-semibold tracking-tight ${compact ? 'text-[#2f5eae]' : 'text-[#78a8ff]'}`}>Pastor Daniel <em className="not-italic">de Castro</em></span>
         {!compact && <span className="mt-1 block font-mono text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/55">Deputado distrital · DF</span>}
       </span>
     </Link>
@@ -63,11 +63,28 @@ function Header({ onMenu }: { onMenu?: () => void }) {
           <Link href="/coordination" className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary hover:bg-secondary sm:flex" data-testid="link-coordination-header">
             <ShieldCheck size={15} className="text-accent-foreground" /> Coordenação
           </Link>
-          <Link href="/sign-in" className="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground transition hover:-translate-y-0.5" data-testid="link-sign-in-header">Entrar</Link>
+          {clerkPubKey ? <HeaderAuthActions /> : <Link href="/sign-in" className="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground transition hover:-translate-y-0.5" data-testid="link-sign-in-header">Entrar</Link>}
         </div>
       </div>
     </header>
   );
+}
+
+function HeaderAuthActions() {
+  const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
+  if (!isLoaded) return <span className="h-8 w-20 rounded-lg bg-muted shimmer" aria-label="Carregando sessão" />;
+  if (!isSignedIn) return <Link href="/sign-in" className="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground transition hover:-translate-y-0.5" data-testid="link-sign-in-header">Entrar</Link>;
+  const displayName = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Coordenação';
+  const handleSignOut = async () => {
+    await signOut();
+    setLocation('/');
+  };
+  return <div className="flex items-center gap-2" data-testid="header-authenticated">
+    <span className="hidden max-w-[150px] truncate rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-primary sm:block" title={displayName}>Olá, {displayName}</span>
+    <button onClick={handleSignOut} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-primary transition hover:border-primary hover:bg-secondary" data-testid="button-sign-out"><LogOut size={14} /> Sair</button>
+  </div>;
 }
 
 function SideRail({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -105,11 +122,24 @@ function StatTile({ label, value, icon: Icon, accent = false }: { label: string;
 function Skeleton({ className = '' }: { className?: string }) { return <div className={`shimmer rounded-xl ${className}`} />; }
 function ErrorState({ onRetry, message = 'Não foi possível atualizar os dados.' }: { onRetry: () => void; message?: string }) { return <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-10 text-center"><CircleAlert size={26} className="text-destructive" /><p className="mt-3 text-sm font-semibold">{message}</p><button onClick={onRetry} className="mt-4 rounded-lg border border-border px-3 py-2 text-xs font-bold hover:bg-secondary" data-testid="button-retry">Tentar novamente</button></div>; }
 
+function FallbackMap({ churches, selectedId, onSelect }: { churches: Church[]; selectedId?: number; onSelect: (church: Church) => void }) {
+  const points = useMemo(() => churches.map((church) => ({
+    church,
+    left: `${Math.max(4, Math.min(96, ((church.longitude + 48.7) / 1.5) * 100))}%`,
+    top: `${Math.max(6, Math.min(94, ((-15.2 - church.latitude) / 1) * 100))}%`,
+  })), [churches]);
+  return <div className="map-grid absolute inset-0 overflow-hidden">
+    <div className="map-water" /><div className="map-road map-road-main" /><div className="map-road map-road-secondary" /><div className="map-road map-road-vertical" />
+    <div className="absolute left-5 top-5 z-10 rounded-xl border border-white/70 bg-card/90 px-3 py-2 shadow-sm backdrop-blur"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary"><span className="h-2 w-2 rounded-full bg-accent" /> Distrito Federal</div><div className="mt-1 text-[11px] text-muted-foreground">Pins reais · visualização compatível</div></div>
+    {points.map(({ church, left, top }) => <button key={church.id} style={{ left, top }} onClick={() => onSelect(church)} className={`absolute z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card transition hover:z-20 hover:scale-150 ${selectedId === church.id ? 'h-6 w-6 bg-primary ring-4 ring-accent/40' : church.status === ChurchStatus.action_done ? 'bg-primary' : church.status === ChurchStatus.group_ready ? 'bg-accent' : 'bg-card ring-1 ring-primary'}`} aria-label={`Ver ${church.name}`} data-testid={`map-marker-${church.id}`} />)}
+  </div>;
+}
+
 function MapCanvas({ churches, selectedId, onSelect }: { churches: Church[]; selectedId?: number; onSelect: (church: Church) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [token, setToken] = useState('');
-  const [mapError, setMapError] = useState(false);
+  const [mapMode, setMapMode] = useState<'loading' | 'mapbox' | 'fallback' | 'error'>('loading');
   const geojson = useMemo(() => ({
     type: 'FeatureCollection' as const,
     features: churches.map((church) => ({
@@ -121,57 +151,78 @@ function MapCanvas({ churches, selectedId, onSelect }: { churches: Church[]; sel
 
   useEffect(() => {
     fetch('/api/map-config')
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error('Map configuration unavailable');
+        return response.json();
+      })
       .then((data: { token?: string }) => {
         if (data.token) setToken(data.token);
-        else setMapError(true);
+        else setMapMode('error');
       })
-      .catch(() => setMapError(true));
+      .catch(() => setMapMode('error'));
   }, []);
 
   useEffect(() => {
-    if (!token || !containerRef.current || mapRef.current) return;
+    if (!token || !containerRef.current || mapRef.current || mapMode === 'fallback') return;
+    if (!mapboxgl.supported()) {
+      setMapMode('fallback');
+      return;
+    }
     mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
-      center: [-47.9292, -15.78],
-      zoom: 9.5,
-      minZoom: 8,
-      maxZoom: 17,
-      attributionControl: true,
-    });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-    map.on('load', () => {
-      map.addSource('churches', { type: 'geojson', data: geojson, cluster: true, clusterMaxZoom: 13, clusterRadius: 48 });
-      map.addLayer({ id: 'church-clusters', type: 'circle', source: 'churches', filter: ['has', 'point_count'], paint: { 'circle-color': '#182950', 'circle-radius': ['step', ['get', 'point_count'], 19, 50, 25, 150, 31], 'circle-stroke-width': 3, 'circle-stroke-color': '#f8d23b' } });
-      map.addLayer({ id: 'church-cluster-count', type: 'symbol', source: 'churches', filter: ['has', 'point_count'], layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12 }, paint: { 'text-color': '#f8d23b' } });
-      map.addLayer({ id: 'church-points', type: 'circle', source: 'churches', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': ['match', ['get', 'status'], 'action_done', '#182950', 'group_ready', '#f8d23b', '#fffef9'], 'circle-radius': 6, 'circle-stroke-width': 2, 'circle-stroke-color': '#182950' } });
-      map.addLayer({ id: 'church-points-selected', type: 'circle', source: 'churches', filter: ['==', ['get', 'id'], -1], paint: { 'circle-color': '#182950', 'circle-radius': 11, 'circle-stroke-width': 3, 'circle-stroke-color': '#f8d23b' } });
-      map.on('click', 'church-clusters', (event) => {
-        const feature = event.features?.[0] as unknown as { properties?: Record<string, unknown>; geometry?: { type: string; coordinates: [number, number] } } | undefined;
-        if (!feature) return;
-        const clusterId = feature.properties?.cluster_id;
-        const source = map.getSource('churches') as mapboxgl.GeoJSONSource;
-        source.getClusterExpansionZoom(clusterId, (error, zoom) => {
-          if (error || zoom == null || feature.geometry?.type !== 'Point') return;
-          const coordinates = feature.geometry.coordinates;
-          map.easeTo({ center: coordinates, zoom });
+    let map: mapboxgl.Map | null = null;
+    try {
+      map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: [-47.9292, -15.78],
+        zoom: 9.5,
+        minZoom: 8,
+        maxZoom: 17,
+        attributionControl: true,
+      });
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+      map.on('error', () => {
+        map?.remove();
+        mapRef.current = null;
+        setMapMode('fallback');
+      });
+      map.on('load', () => {
+        if (!map) return;
+        map.addSource('churches', { type: 'geojson', data: geojson, cluster: true, clusterMaxZoom: 13, clusterRadius: 48 });
+        map.addLayer({ id: 'church-clusters', type: 'circle', source: 'churches', filter: ['has', 'point_count'], paint: { 'circle-color': '#182950', 'circle-radius': ['step', ['get', 'point_count'], 19, 50, 25, 150, 31], 'circle-stroke-width': 3, 'circle-stroke-color': '#f8d23b' } });
+        map.addLayer({ id: 'church-cluster-count', type: 'symbol', source: 'churches', filter: ['has', 'point_count'], layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12 }, paint: { 'text-color': '#f8d23b' } });
+        map.addLayer({ id: 'church-points', type: 'circle', source: 'churches', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': ['match', ['get', 'status'], 'action_done', '#182950', 'group_ready', '#f8d23b', '#fffef9'], 'circle-radius': 6, 'circle-stroke-width': 2, 'circle-stroke-color': '#182950' } });
+        map.addLayer({ id: 'church-points-selected', type: 'circle', source: 'churches', filter: ['==', ['get', 'id'], -1], paint: { 'circle-color': '#182950', 'circle-radius': 11, 'circle-stroke-width': 3, 'circle-stroke-color': '#f8d23b' } });
+        map.on('click', 'church-clusters', (event) => {
+          const feature = event.features?.[0] as unknown as { properties?: Record<string, unknown>; geometry?: { type: string; coordinates: [number, number] } } | undefined;
+          if (!feature) return;
+          const clusterId = Number(feature.properties?.cluster_id);
+          if (!Number.isFinite(clusterId)) return;
+          const source = map?.getSource('churches') as mapboxgl.GeoJSONSource;
+          source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+            if (error || zoom == null || feature.geometry?.type !== 'Point') return;
+            map?.easeTo({ center: feature.geometry.coordinates, zoom });
+          });
         });
+        map.on('click', 'church-points', (event) => {
+          const feature = event.features?.[0] as unknown as { properties?: Record<string, unknown> } | undefined;
+          const id = Number(feature?.properties?.id);
+          const church = churches.find((item) => item.id === id);
+          if (church) onSelect(church);
+        });
+        map.on('mouseenter', 'church-clusters', () => { map?.getCanvas().style && (map.getCanvas().style.cursor = 'pointer'); });
+        map.on('mouseenter', 'church-points', () => { map?.getCanvas().style && (map.getCanvas().style.cursor = 'pointer'); });
+        map.on('mouseleave', 'church-clusters', () => { map?.getCanvas().style && (map.getCanvas().style.cursor = ''); });
+        map.on('mouseleave', 'church-points', () => { map?.getCanvas().style && (map.getCanvas().style.cursor = ''); });
+        setMapMode('mapbox');
       });
-      map.on('click', 'church-points', (event) => {
-        const feature = event.features?.[0] as unknown as { properties?: Record<string, unknown> } | undefined;
-        const id = Number(feature?.properties?.id);
-        const church = churches.find((item) => item.id === id);
-        if (church) onSelect(church);
-      });
-      map.on('mouseenter', 'church-clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseenter', 'church-points', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'church-clusters', () => { map.getCanvas().style.cursor = ''; });
-      map.on('mouseleave', 'church-points', () => { map.getCanvas().style.cursor = ''; });
-    });
-    mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+      mapRef.current = map;
+    } catch {
+      map?.remove();
+      mapRef.current = null;
+      setMapMode('fallback');
+    }
+    return () => { map?.remove(); mapRef.current = null; };
   }, [token]);
 
   useEffect(() => {
@@ -185,8 +236,9 @@ function MapCanvas({ churches, selectedId, onSelect }: { churches: Church[]; sel
   }, [geojson, selectedId]);
 
   return <div className="mapbox-shell relative min-h-[460px] overflow-hidden rounded-[1.5rem] border border-border shadow-sm sm:min-h-[620px]" data-testid="map-canvas">
-    <div ref={containerRef} className="absolute inset-0" />
-    {(mapError || !token) && <div className="absolute inset-0 grid place-items-center bg-[#e8e4d8]"><div className="rounded-2xl border border-dashed border-primary/20 bg-card/90 px-6 py-5 text-center backdrop-blur">{mapError ? <CircleAlert size={24} className="mx-auto text-destructive" /> : <Loader2 size={24} className="mx-auto animate-spin text-primary" />}<p className="mt-2 text-sm font-semibold">{mapError ? 'Mapa indisponível' : 'Carregando mapa do Distrito Federal'}</p><p className="mt-1 max-w-xs text-xs text-muted-foreground">{mapError ? 'A configuração do mapa ainda não está disponível. Tente atualizar a página.' : 'Preparando pontos de mobilização...'}</p></div></div>}
+    <div ref={containerRef} className={`absolute inset-0 ${mapMode === 'mapbox' ? '' : 'hidden'}`} />
+    {mapMode === 'fallback' && <FallbackMap churches={churches} selectedId={selectedId} onSelect={onSelect} />}
+    {(mapMode === 'error' || mapMode === 'loading') && <div className="absolute inset-0 grid place-items-center bg-[#e8e4d8]"><div className="rounded-2xl border border-dashed border-primary/20 bg-card/90 px-6 py-5 text-center backdrop-blur">{mapMode === 'error' ? <CircleAlert size={24} className="mx-auto text-destructive" /> : <Loader2 size={24} className="mx-auto animate-spin text-primary" />}<p className="mt-2 text-sm font-semibold">{mapMode === 'error' ? 'Mapa indisponível' : 'Carregando mapa do Distrito Federal'}</p><p className="mt-1 max-w-xs text-muted-foreground text-xs">{mapMode === 'error' ? 'A configuração do mapa ainda não está disponível. Tente atualizar a página.' : 'Preparando pontos de mobilização...'}</p></div></div>}
     <div className="absolute left-5 top-5 z-10 rounded-xl border border-white/70 bg-card/90 px-3 py-2 shadow-sm backdrop-blur"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary"><span className="h-2 w-2 rounded-full bg-accent" /> Distrito Federal</div><div className="mt-1 text-[11px] text-muted-foreground">{churches.length.toLocaleString('pt-BR')} pontos de mobilização</div></div>
     {churches.length === 0 && <div className="absolute inset-0 grid place-items-center"><div className="rounded-2xl border border-dashed border-primary/20 bg-card/85 px-6 py-5 text-center backdrop-blur"><MapPin size={24} className="mx-auto text-muted-foreground" /><p className="mt-2 text-sm font-semibold">Nenhuma igreja encontrada</p><p className="mt-1 text-xs text-muted-foreground">Tente limpar os filtros para ampliar a busca.</p></div></div>}
     <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2 rounded-xl border border-white/80 bg-card/90 p-2 text-[10px] font-semibold shadow-sm backdrop-blur"><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-card ring-1 ring-primary" /> Sem grupo</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-accent" /> Grupo ativo</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-primary" /> Ação registrada</span></div>
@@ -217,7 +269,7 @@ function ChurchDetail({ church, onClose, onReport }: { church: Church; onClose: 
 function FlyerDialog({ church, onClose }: { church: Church; onClose: () => void }) {
   const create = useCreateFlyerReport();
   const [form, setForm] = useState({ actionDate: new Date().toISOString().slice(0, 10), flyerCount: '', volunteerName: '', volunteerPhone: '', note: '' });
-  const submit = (event: FormEvent) => { event.preventDefault(); create.mutate({ churchId: church.id, data: { actionDate: form.actionDate, flyerCount: Number(form.flyerCount), volunteerName: form.volunteerName, volunteerPhone: form.volunteerPhone, note: form.note || null } }, { onSuccess: onClose }); };
+  const submit = (event: FormEvent) => { event.preventDefault(); create.mutate({ churchId: church.id, data: { actionDate: form.actionDate, flyerCount: Number(form.flyerCount), volunteerName: form.volunteerName, volunteerPhone: form.volunteerPhone, note: form.note || null } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetMobilizationSummaryQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetChurchQueryKey(church.id) }); queryClient.invalidateQueries({ queryKey: getListChurchesQueryKey() }); onClose(); } }); };
   return <div className="fixed inset-0 z-[60] grid place-items-center bg-primary/45 p-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl fade-up" role="dialog" aria-modal="true" data-testid="dialog-flyer-report"><div className="flex items-start justify-between border-b border-border p-5"><div><div className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-accent-foreground">Registro de campo</div><h2 className="mt-1 text-lg font-bold">Flyers distribuídos</h2><p className="mt-1 text-xs text-muted-foreground">{church.name}</p></div><button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted" aria-label="Fechar formulário" data-testid="button-close-flyer-dialog"><X size={18} /></button></div><form onSubmit={submit} className="space-y-3 p-5"><div className="grid grid-cols-2 gap-3"><label className="space-y-1.5 text-xs font-semibold">Data<input type="date" required value={form.actionDate} onChange={e => setForm({ ...form, actionDate: e.target.value })} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal" data-testid="input-action-date" /></label><label className="space-y-1.5 text-xs font-semibold">Quantidade<input type="number" min="1" required placeholder="Ex.: 80" value={form.flyerCount} onChange={e => setForm({ ...form, flyerCount: e.target.value })} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal" data-testid="input-flyer-count" /></label></div><label className="block space-y-1.5 text-xs font-semibold">Seu nome<input required minLength={2} value={form.volunteerName} onChange={e => setForm({ ...form, volunteerName: e.target.value })} placeholder="Como podemos identificar você?" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal" data-testid="input-volunteer-name" /></label><label className="block space-y-1.5 text-xs font-semibold">Celular<input required minLength={8} value={form.volunteerPhone} onChange={e => setForm({ ...form, volunteerPhone: e.target.value })} placeholder="(61) 9 0000-0000" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal" data-testid="input-volunteer-phone" /></label><label className="block space-y-1.5 text-xs font-semibold">Observação <span className="font-normal text-muted-foreground">(opcional)</span><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="Ex.: ação na saída do culto" className="mt-1 min-h-16 w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal" data-testid="textarea-flyer-note" /></label>{create.isError && <p className="text-xs font-semibold text-destructive">Não foi possível enviar. Confira os dados e tente novamente.</p>}<button disabled={create.isPending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:-translate-y-0.5" data-testid="button-submit-flyer-report">{create.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Enviar registro para aprovação</button><p className="text-center text-[10px] text-muted-foreground">O registro será revisado pela coordenação antes de entrar no total confirmado.</p></form></div></div>;
 }
 
@@ -249,7 +301,7 @@ function Coordination() {
   const reports = useListCoordinationFlyerReports(filter === 'all' ? undefined : { status: filter }, { query: { queryKey: getListCoordinationFlyerReportsQueryKey(filter === 'all' ? undefined : { status: filter }) } });
   const summary = useGetMobilizationSummary({ query: { queryKey: getGetMobilizationSummaryQueryKey() } });
   const updateStatus = useUpdateFlyerReportStatus();
-  const approve = (report: FlyerReport, next: 'approved' | 'rejected') => updateStatus.mutate({ reportId: report.id, data: { status: next } }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListCoordinationFlyerReportsQueryKey(filter === 'all' ? undefined : { status: filter }) }) });
+  const approve = (report: FlyerReport, next: 'approved' | 'rejected') => updateStatus.mutate({ reportId: report.id, data: { status: next } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListCoordinationFlyerReportsQueryKey(filter === 'all' ? undefined : { status: filter }) }); queryClient.invalidateQueries({ queryKey: getGetMobilizationSummaryQueryKey() }); queryClient.invalidateQueries({ queryKey: getListChurchesQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetChurchQueryKey(report.churchId) }); } });
   return <Shell><main className="mx-auto max-w-[1250px] px-4 py-6 sm:px-7 sm:py-8"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Área reservada · Operação 11.133</div><h1 className="mt-2 text-3xl font-bold tracking-tight">Coordenação</h1><p className="mt-2 max-w-xl text-sm text-muted-foreground">Aprove registros de campo e mantenha os grupos de cada igreja prontos para a próxima ação.</p></div><Link href="/" className="flex w-fit items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-secondary" data-testid="link-back-map"><MapPin size={14} /> Voltar ao mapa</Link></div>
     <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4"><StatTile label="Igrejas" value={summary.data?.churches ?? '—'} icon={MapPin} /><StatTile label="Pendentes" value={summary.data?.pendingReports ?? '—'} icon={ClipboardCheck} accent /><StatTile label="Ações" value={summary.data?.churchesWithActions ?? '—'} icon={Target} /><StatTile label="Grupos ativos" value={summary.data?.churchesWithGroups ?? '—'} icon={MessageCircle} /></div>
     <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"><section className="rounded-2xl border border-border bg-card"><div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold">Registros de flyers</h2><p className="mt-1 text-xs text-muted-foreground">Revise os lançamentos feitos pelos voluntários.</p></div><select value={filter} onChange={e => setFilter(e.target.value as typeof filter)} className="rounded-lg border border-input bg-background px-3 py-2 text-xs font-semibold" data-testid="select-report-filter"><option value="pending">Pendentes</option><option value="approved">Aprovados</option><option value="rejected">Recusados</option><option value="all">Todos</option></select></div>{reports.isLoading ? <div className="space-y-3 p-5">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div> : reports.isError ? <div className="p-5"><ErrorState onRetry={() => reports.refetch()} /></div> : reports.data?.length ? <div className="divide-y divide-border">{reports.data.map(report => <div key={report.id} className="p-5" data-testid={`report-row-${report.id}`}><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><div className="flex items-center gap-2"><span className={`rounded-full px-2 py-1 font-mono text-[9px] font-bold uppercase ${report.status === 'pending' ? 'bg-accent text-primary' : report.status === 'approved' ? 'bg-primary text-accent' : 'bg-destructive/10 text-destructive'}`}>{report.status === 'pending' ? 'Pendente' : report.status === 'approved' ? 'Aprovado' : 'Recusado'}</span><span className="font-mono text-[10px] text-muted-foreground">{new Date(report.actionDate).toLocaleDateString('pt-BR')}</span></div><h3 className="mt-2 text-sm font-bold">{report.churchName}</h3><p className="mt-1 text-xs text-muted-foreground">{report.volunteerName} · {report.volunteerPhone}</p>{report.note && <p className="mt-2 border-l-2 border-accent pl-2 text-xs italic text-muted-foreground">“{report.note}”</p>}</div><div className="flex items-center justify-between gap-4 sm:block sm:text-right"><div className="font-mono text-2xl font-bold text-primary">{report.flyerCount.toLocaleString('pt-BR')}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground">flyers</div></div></div>{report.status === 'pending' && <div className="mt-4 flex gap-2 border-t border-border pt-3"><button disabled={updateStatus.isPending} onClick={() => approve(report, 'approved')} className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground" data-testid={`button-approve-report-${report.id}`}><Check size={14} /> Aprovar</button><button disabled={updateStatus.isPending} onClick={() => approve(report, 'rejected')} className="flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/5" data-testid={`button-reject-report-${report.id}`}><XCircle size={14} /> Recusar</button></div>}</div>)}</div> : <div className="p-10 text-center"><ClipboardCheck size={28} className="mx-auto text-muted-foreground" /><h3 className="mt-3 text-sm font-bold">Fila limpa por aqui</h3><p className="mt-1 text-xs text-muted-foreground">Nenhum registro corresponde a este filtro.</p></div>}</section>
