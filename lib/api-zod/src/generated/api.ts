@@ -90,6 +90,7 @@ export const ListChurchesResponseItem = zod.object({
   "whatsappUrl": zod.string().nullish(),
   "flyersConfirmed": zod.number().int(),
   "flyerGoal": zod.number().int(),
+  "coordinatorName": zod.string().nullish(),
   "status": zod.enum(['no_group', 'group_ready', 'action_done'])
 })
 export const ListChurchesResponse = zod.array(ListChurchesResponseItem)
@@ -120,6 +121,7 @@ export const GetChurchResponse = zod.object({
   "whatsappUrl": zod.string().nullish(),
   "flyersConfirmed": zod.number().int(),
   "flyerGoal": zod.number().int(),
+  "coordinatorName": zod.string().nullish(),
   "status": zod.enum(['no_group', 'group_ready', 'action_done'])
 })
 
@@ -270,6 +272,41 @@ export const UpdateChurchCoordinationResponse = zod.object({
   "whatsappUrl": zod.string().nullish(),
   "flyersConfirmed": zod.number().int(),
   "flyerGoal": zod.number().int(),
+  "coordinatorName": zod.string().nullish(),
+  "status": zod.enum(['no_group', 'group_ready', 'action_done'])
+})
+
+
+/**
+ * @summary Designa ou remove o coordenador de uma igreja
+ */
+export const SetChurchCoordinatorParams = zod.object({
+  "churchId": zod.coerce.number().int()
+})
+
+export const SetChurchCoordinatorBody = zod.object({
+  "email": zod.string().email().nullable()
+})
+
+export const SetChurchCoordinatorResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "regionCode": zod.string(),
+  "regionName": zod.string(),
+  "address": zod.string().nullish(),
+  "locality": zod.string().nullish(),
+  "postalCode": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "socialUrl": zod.string().nullish(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "mapsUrl": zod.string(),
+  "whatsappUrl": zod.string().nullish(),
+  "flyersConfirmed": zod.number().int(),
+  "flyerGoal": zod.number().int(),
+  "coordinatorName": zod.string().nullish(),
   "status": zod.enum(['no_group', 'group_ready', 'action_done'])
 })
 

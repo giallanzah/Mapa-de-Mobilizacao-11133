@@ -8,6 +8,7 @@
 
 export * from './church';
 export * from './churchCoordinationUpdate';
+export * from './churchCoordinatorAssignment';
 export * from './churchIssueInput';
 export * from './churchIssueInputIssueType';
 export * from './churchIssueReport';

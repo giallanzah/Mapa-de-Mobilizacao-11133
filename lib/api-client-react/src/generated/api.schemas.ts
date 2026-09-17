@@ -68,6 +68,8 @@ export interface Church {
   whatsappUrl?: string | null;
   flyersConfirmed: number;
   flyerGoal: number;
+  /** @nullable */
+  coordinatorName?: string | null;
   status: ChurchStatus;
 }
 
@@ -160,6 +162,11 @@ export interface ChurchCoordinationUpdate {
   whatsappUrl?: string | null;
   /** @minimum 0 */
   flyerGoal: number;
+}
+
+export interface ChurchCoordinatorAssignment {
+  /** @nullable */
+  email: string | null;
 }
 
 export type ListChurchesParams = {

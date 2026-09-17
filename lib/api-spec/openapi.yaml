@@ -16,6 +16,8 @@ tags:
     description: Registros públicos de ações e correções
   - name: coordination
     description: Operações da equipe de coordenação
+  - name: admin
+    description: Operações restritas à administração
 paths:
   /healthz:
     get:
@@ -240,6 +242,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Church"
+  /admin/churches/{churchId}/coordinator:
+    patch:
+      operationId: setChurchCoordinator
+      tags: [admin]
+      summary: Designa ou remove o coordenador de uma igreja
+      parameters:
+        - $ref: "#/components/parameters/ChurchId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChurchCoordinatorAssignment"
+      responses:
+        "200":
+          description: Igreja atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Church"
+        "403":
+          description: Restrito à administração
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Igreja ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   parameters:
     ChurchId:
@@ -344,6 +378,8 @@ components:
           type: integer
         flyerGoal:
           type: integer
+        coordinatorName:
+          type: ["string", "null"]
         status:
           type: string
           enum: [no_group, group_ready, action_done]
@@ -459,4 +495,11 @@ components:
           type: integer
           minimum: 0
       required: [flyerGoal]
+    ChurchCoordinatorAssignment:
+      type: object
+      properties:
+        email:
+          type: ["string", "null"]
+          format: email
+      required: [email]
 

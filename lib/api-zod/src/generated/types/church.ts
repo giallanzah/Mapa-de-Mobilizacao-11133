@@ -32,5 +32,7 @@ export interface Church {
   whatsappUrl?: string | null;
   flyersConfirmed: number;
   flyerGoal: number;
+  /** @nullable */
+  coordinatorName?: string | null;
   status: ChurchStatus;
 }

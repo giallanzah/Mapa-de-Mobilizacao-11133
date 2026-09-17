@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import {
   CreateChurchIssueReportBody,
   CreateChurchIssueReportParams,
@@ -8,6 +8,8 @@ import {
   CreateFlyerReportParams,
   ListChurchesQueryParams,
   ListCoordinationFlyerReportsQueryParams,
+  SetChurchCoordinatorBody,
+  SetChurchCoordinatorParams,
   UpdateChurchCoordinationBody,
   UpdateChurchCoordinationParams,
   UpdateFlyerReportStatusBody,
@@ -165,7 +167,7 @@ function serializeChurch(church: typeof churches.$inferSelect) {
   const status =
     flyersConfirmed > 0
       ? "action_done"
-      : church.whatsappUrl
+      : church.whatsappUrl && church.coordinatorClerkId
         ? "group_ready"
         : "no_group";
   return {
@@ -186,6 +188,7 @@ function serializeChurch(church: typeof churches.$inferSelect) {
     whatsappUrl: church.whatsappUrl,
     flyersConfirmed,
     flyerGoal: church.flyerGoal ?? 100,
+    coordinatorName: church.coordinatorName,
     status,
   };
 }
@@ -194,6 +197,18 @@ function requireCoordinator(req: Request, res: Response, next: NextFunction) {
   const auth = getAuth(req);
   if (!auth?.userId) {
     return res.status(401).json({ error: "Acesso restrito à coordenação." });
+  }
+  return next();
+}
+
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return res.status(401).json({ error: "Acesso restrito à coordenação." });
+  }
+  const user = await clerkClient.users.getUser(auth.userId);
+  if (user.publicMetadata?.role !== "admin") {
+    return res.status(403).json({ error: "Acesso restrito à administração." });
   }
   return next();
 }
@@ -444,6 +459,44 @@ router.patch(
     const [updated] = await db
       .update(churches)
       .set(body)
+      .where(eq(churches.id, params.churchId))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "Igreja não encontrada." });
+      return;
+    }
+    res.json(serializeChurch(updated));
+  },
+);
+
+router.patch(
+  "/admin/churches/:churchId/coordinator",
+  requireAdmin,
+  async (req, res) => {
+    const params = SetChurchCoordinatorParams.parse(req.params);
+    const body = SetChurchCoordinatorBody.parse(req.body);
+
+    let coordinatorClerkId: string | null = null;
+    let coordinatorName: string | null = null;
+    if (body.email) {
+      const { data: matches } = await clerkClient.users.getUserList({
+        emailAddress: [body.email],
+      });
+      const match = matches[0];
+      if (!match) {
+        res.status(404).json({ error: "Usuário não encontrado no Clerk." });
+        return;
+      }
+      coordinatorClerkId = match.id;
+      coordinatorName =
+        [match.firstName, match.lastName].filter(Boolean).join(" ") ||
+        match.primaryEmailAddress?.emailAddress ||
+        body.email;
+    }
+
+    const [updated] = await db
+      .update(churches)
+      .set({ coordinatorClerkId, coordinatorName })
       .where(eq(churches.id, params.churchId))
       .returning();
     if (!updated) {

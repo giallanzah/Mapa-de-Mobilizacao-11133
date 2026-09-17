@@ -49,6 +49,8 @@ export const churches = pgTable(
     flyersConfirmed: integer("flyers_confirmed").notNull().default(0),
     flyerGoal: integer("flyer_goal").notNull().default(100),
     status: churchStatus("status").notNull().default("no_group"),
+    coordinatorClerkId: text("coordinator_clerk_id"),
+    coordinatorName: text("coordinator_name"),
     sourceId: text("source_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
