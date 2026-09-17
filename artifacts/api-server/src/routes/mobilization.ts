@@ -208,7 +208,13 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   }
   const user = await clerkClient.users.getUser(auth.userId);
   if (user.publicMetadata?.role !== "admin") {
-    return res.status(403).json({ error: "Acesso restrito à administração." });
+    // TODO(debug): remover depois de diagnosticar o 403 do papel admin.
+    return res.status(403).json({
+      error: "Acesso restrito à administração.",
+      debugUserId: user.id,
+      debugEmail: user.primaryEmailAddress?.emailAddress ?? null,
+      debugPublicMetadata: user.publicMetadata,
+    });
   }
   return next();
 }
