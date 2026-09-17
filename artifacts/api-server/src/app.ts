@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type ErrorRequestHandler, type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -46,5 +46,28 @@ app.use(
 );
 
 app.use("/api", router);
+
+const apiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const issues = error && typeof error === "object" && "issues" in error
+    ? (error as { issues?: Array<{ path: Array<string | number>; message: string }> }).issues
+    : undefined;
+  if (issues) {
+    res.status(400).json({
+      error: "Dados inválidos.",
+      details: issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+    return;
+  }
+  res.status(500).json({ error: "Erro interno do servidor." });
+};
+
+app.use(apiErrorHandler);
 
 export default app;
